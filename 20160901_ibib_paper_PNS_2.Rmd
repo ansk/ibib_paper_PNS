@@ -39,6 +39,9 @@ library(MASS)
 library(fitdistrplus)
 
 plotFitted = function(mod,lambda,data,ylabel){
+  #plot experimentalnich dat a predikce pro kazdou stranu zvlast, barevne odlisne
+  #predikce pro prumerne hodnoty veku
+  #confidence intervals - neni obecna shoda mezi teoret. statistiky, jak to delat, jedna moznost je lmertest lmertools - reprezentuje jednu vetev teoretiku
   
   x=seq(1,5,0.1)
 y_pred=predict(mod,level=0,data.frame(age_c=0,lat='R',loc_num=x))
@@ -64,6 +67,9 @@ points(origData_x_L,origData_y_L,col='green')
 }
 
 findLambda = function(data,response,lambdaRange=seq(1/20,2,1/20)){
+  
+  #Box-Cox trpi obecne tim, ze nepracuje s nahodnym efektem. Venca doporucuje u LME zkusit udelat cyklus pres ruzne lambda a spocitat p-value Shapiro-Wilkova testu normality residui - meritko optimality (resid(mod), bez parametru)
+  
   pvalOpt=0
   #lambdaRange=seq(1/20,2,1/20)
   lambdaOpt=lambdaRange[1]
@@ -124,14 +130,8 @@ summary(mod3_r)
 #diagnostika - to model se zdá snad v pořádku
 plot(mod3_r)
 
-#idea byla zobrazit experimentální data a predikci modelem, ale nevím, jak to pojmout, je tam příliš mnoho vysvětlujících veličin, musel bych některé zafixovat, mohu zfixovat např lateralitu a zobrazit jen měřená data pro pravou stranu, jak ale s věkem? Ten v grafu jakoby ignorovat a zobrazit tam všechna experimentální data z pravé strany, jakéhokoliv věku a predikci udělat na centrovaný věk, nějak takto?
-
 plotFitted(mod3_r,lambda,data,'FA')
    
-#confidence intervals - 
-
-
-
 ```
 
 ***Závěr:***
