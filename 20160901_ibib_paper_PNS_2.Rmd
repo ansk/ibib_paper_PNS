@@ -1,0 +1,283 @@
+---
+title: "Periferní nervy - statistická analýza"
+output: html_document
+---
+
+Metody
+======
+
+**Linear mixed-effects model**
+
+Provedeny Box-Coxovy transformace pro zlepšení charakteristiky dat
+
+*Závislé proměnné:*
+
+FA, ADC, NQA, GFA
+
+*Vysvětlující proměnné:*
+
+* lokalizace (loc_num) modelovaná jako numerická proměnná, lineární závislost, zkoušena i kvadratická, v případě ADC je, zdá se, oprávěný i kvadratický člen (na hranici signifikance)
+
+* věk
+
+* lateralita
+
+* interakce mezi lokalizací, věkem a lateralitou (včetně trojné interakce)
+
+Zjednodušování modelu - Akaike information criterion, likelihood ratio tests
+
+Výsledky
+========
+
+FA
+--
+
+```{r,echo=FALSE}
+library(car)
+library(nlme)
+library(MASS)
+library(fitdistrplus)
+
+plotFitted = function(mod,lambda,data,ylabel){
+  
+  x=seq(1,5,0.1)
+y_pred=predict(mod,level=0,data.frame(age_c=0,lat='R',loc_num=x))
+
+y_pred_unTransf=(y_pred*lambda + 1)^(1/lambda)
+
+origData_x_R=data[data$lat=='R',]$loc_num
+origData_x_L=data[data$lat=='L',]$loc_num
+
+origData_y_R=eval(parse(text=paste("data[data$lat=='R',]$",ylabel,sep="")))
+origData_y_L=eval(parse(text=paste("data[data$lat=='L',]$",ylabel,sep="")))
+
+plot(x,y_pred_unTransf,type='l',col='red',ylim=range(c(origData_y_R,origData_y_L)),ylab=ylabel,xlab='Locality')
+
+y_pred=predict(mod,level=0,data.frame(age_c=0,lat='L',loc_num=x))
+y_pred_unTransf=(y_pred*lambda + 1)^(1/lambda)
+points(x,y_pred_unTransf,type='l',col='green')
+
+#points(data[data$lat=='L',]$loc_num,data[data$lat=='L',]$FA)
+points(origData_x_R,origData_y_R,col='red')
+points(origData_x_L,origData_y_L,col='green')
+
+}
+
+findLambda = function(data,response,lambdaRange=seq(1/20,2,1/20)){
+  pvalOpt=0
+  #lambdaRange=seq(1/20,2,1/20)
+  lambdaOpt=lambdaRange[1]
+  ind=1
+  pval=vector()
+  for ( lambda in lambdaRange){
+   # print(lambdaOpt)
+    data_t=data
+    data_t$transfResponse = (response^(lambda)-1)/lambda
+    #mod=lme(FA~loc_num*lat*age_c,random=~1|id,data_t,method="ML")
+    mod=lme(transfResponse~loc_num*lat*age_c,random=~1|id,data_t,method="ML")    
+    pval[ind]=shapiro.test(resid(mod))$p.value
+    if (pvalOpt < pval[ind]) {
+      pvalOpt=pval[ind]
+      lambdaOpt=lambda
+    }
+    ind=ind+1
+  }
+  plot(lambdaRange,pval,type='l')
+  return(lambdaOpt)
+}
+
+data=read.delim("PLS_14_contr_stat_forR3.csv",sep=";")
+data$loc_num=as.integer(data$loc)
+data$age_c=data$age-mean(data$age)
+
+Boxplot(FA~loc*lat,data,labels=id,id.method='n')
+
+Boxplot(ADC~loc*lat,data,labels=id,id.method='n')
+Boxplot(NQA~loc*lat,data,labels=id,id.method='n')
+Boxplot(GFA~loc*lat,data,labels=id,id.method='n')
+
+bc=boxcox(FA~loc*lat*age_c,data=data,lambda=seq(0,1,1/20))
+#bc=boxcox(FA~loc_num*lat*age_c*I(loc_num^2),data=data,lambda=seq(0,1,1/20))
+
+lambda=bc$x[which.max(bc$y)]
+print(lambda)
+
+lambda=findLambda(data,data$FA)
+print(lambda)
+
+data_t=data
+data_t$FA = (data$FA^(lambda)-1)/lambda
+
+mod1=lme(FA~loc_num*lat*age_c+I(loc_num^2)*lat*age_c+I(loc_num^3)*lat*age_c,random=~1|id,data_t,method="ML")
+mod2=lme(FA~loc_num*lat*age_c+I(loc_num^2)*lat*age_c,random=~1|id,data_t,method="ML")
+mod3=lme(FA~loc_num*lat*age_c,random=~1|id,data_t,method="ML")
+mod4=lme(FA~lat*age_c,random=~1|id,data_t,method="ML")
+
+anova(mod1,mod2,mod3,mod4)
+
+#z hlediska locality nevysvetluje vice mocnina loc_num, staci linearni
+#dalsi zjednoduseni modelu
+
+mod3_r=stepAIC(mod3)
+
+summary(mod3_r)
+#diagnostika - to model se zdá snad v pořádku
+plot(mod3_r)
+
+#idea byla zobrazit experimentální data a predikci modelem, ale nevím, jak to pojmout, je tam příliš mnoho vysvětlujících veličin, musel bych některé zafixovat, mohu zfixovat např lateralitu a zobrazit jen měřená data pro pravou stranu, jak ale s věkem? Ten v grafu jakoby ignorovat a zobrazit tam všechna experimentální data z pravé strany, jakéhokoliv věku a predikci udělat na centrovaný věk, nějak takto?
+
+plotFitted(mod3_r,lambda,data,'FA')
+   
+#confidence intervals - 
+
+
+
+```
+
+***Závěr:***
+
+Signifikantní efekt pozice (loc_num) - lineární
+
+Signifikantní lateralita, v interakci s věkem
+
+
+
+ADC
+---
+
+```{r,echo=FALSE}
+
+#ADC
+bc=boxcox(ADC~loc*lat*age_c,data=data,lambda=seq(0,1,1/20))
+#bc=boxcox(FA~loc_num*lat*age_c*I(loc_num^2),data=data,lambda=seq(0,1,1/20))
+
+lambda=bc$x[which.max(bc$y)]
+print(lambda)
+
+lambda=findLambda(data,data$ADC)
+print(lambda)
+
+data_t=data
+data_t$ADC = (data$ADC^(lambda)-1)/lambda
+
+mod1=lme(ADC~loc_num*lat*age_c+I(loc_num^2)*lat*age_c+I(loc_num^3)*lat*age_c,random=~1|id,data_t,method="ML")
+mod2=lme(ADC~loc_num*lat*age_c+I(loc_num^2)*lat*age_c,random=~1|id,data_t,method="ML")
+mod3=lme(ADC~loc_num*lat*age_c,random=~1|id,data_t,method="ML")
+mod4=lme(ADC~lat*age_c,random=~1|id,data_t,method="ML")
+
+anova(mod1,mod2,mod3,mod4)
+
+#tady je potreba i mocnina??
+
+mod3_r=stepAIC(mod3)
+
+summary(mod3_r)
+plot(mod3_r)
+#heteroskedasticita rezidui?
+
+#plotFitted(mod3_r,lambda,data[data$lat=='R',]$loc_num,data[data$lat=='R',]$ADC,'ADC')
+  plotFitted(mod3_r,lambda,data,'ADC')
+
+mod2_r=stepAIC(mod2)
+summary(mod2_r)
+plot(mod2_r)
+
+#plotFitted(mod2_r,lambda,data[data$lat=='R',]$loc_num,data[data$lat=='R',]$ADC,'ADC')
+plotFitted(mod2_r,lambda,data,'ADC')
+
+```
+
+***Závěr:***
+
+Signifikantní efekt pozice (loc_num) - lineární a asi i kvadratický
+
+Signifikantní lateralita
+
+Signifikantní věk (je to na hraně signifikance, neprošlo by to korekcí na multiple comparisons)
+
+Ten model se mi moc nelíbí, ale nevím již jak jej vylepšit. Nejsem si jistý tou kvadratickou závislostí
+
+NQA
+---
+
+```{r,echo=FALSE}
+#NQA
+bc=boxcox(NQA~loc*lat*age_c,data=data,lambda=seq(-1,1,1/20))
+
+lambda=bc$x[which.max(bc$y)]
+print(lambda)
+
+lambda=findLambda(data,data$NQA)
+print(lambda)
+
+data_t=data
+data_t$NQA = (data$NQA^(lambda)-1)/lambda
+
+mod1=lme(NQA~loc_num*lat*age_c+I(loc_num^2)*lat*age_c+I(loc_num^3)*lat*age_c,random=~1|id,data_t,method="ML")
+mod2=lme(NQA~loc_num*lat*age_c+I(loc_num^2)*lat*age_c,random=~1|id,data_t,method="ML")
+mod3=lme(NQA~loc_num*lat*age_c,random=~1|id,data_t,method="ML")
+mod4=lme(NQA~lat*age_c,random=~1|id,data_t,method="ML")
+
+anova(mod1,mod2,mod3,mod4)
+
+
+
+mod3_r=stepAIC(mod3)
+
+summary(mod3_r)
+plot(mod3_r)
+
+#plotFitted(mod3_r,lambda,data[data$lat=='R',]$loc_num,data[data$lat=='R',]$NQA,'NQA')
+
+plotFitted(mod3_r,lambda,data,'NQA')
+
+```
+
+***Závěr:***
+
+Signifikantní pozice
+
+
+GFA
+---
+
+```{r,echo=FALSE}
+
+#GFA
+
+bc=boxcox(GFA~loc*lat*age_c,data=data,lambda=seq(-1,4,1/20))
+
+lambda=bc$x[which.max(bc$y)]
+
+print(lambda)
+
+lambda=findLambda(data,data$GFA,seq(1/20,20,1/20))
+print(lambda)
+
+
+data_t=data
+data_t$GFA = (data$GFA^(lambda)-1)/lambda
+
+mod1=lme(GFA~loc_num*lat*age_c+I(loc_num^2)*lat*age_c+I(loc_num^3)*lat*age_c,random=~1|id,data_t,method="ML")
+mod2=lme(GFA~loc_num*lat*age_c+I(loc_num^2)*lat*age_c,random=~1|id,data_t,method="ML")
+mod3=lme(GFA~loc_num*lat*age_c,random=~1|id,data_t,method="ML")
+mod4=lme(GFA~(loc_num+lat+age_c)^2,random=~1|id,data_t,method="ML")
+mod5=lme(GFA~loc_num+lat+age_c,random=~1|id,data_t,method="ML")
+mod6=lme(GFA~lat+age_c,random=~1|id,data_t,method="ML")
+
+anova(mod1,mod2,mod3,mod4,mod5,mod6)
+anova(mod5,mod6)
+
+
+mod3_r=stepAIC(mod3)
+#nezjednodusuje se
+
+summary(mod3)
+plot(mod3)
+
+plotFitted(mod3,lambda,data,'GFA')
+```
+
+***Závěr:***
+
+Zde vypadá, že není nic signifikantní
