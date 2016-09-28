@@ -163,7 +163,7 @@ mod3_r=stepAIC(mod3)
 summary(mod3_r)
 #diagnostika - to model se zdá snad v pořádku
 plot(mod3_r)
-
+hist(resid(mod3_r))
 plotFitted(mod3_r,lambda,data,'FA')
    
 ```
@@ -191,7 +191,7 @@ mod3_r=stepAIC(mod3)
 summary(mod3_r)
 #diagnostika - to model se zdá snad v pořádku
 plot(mod3_r)
-
+hist(resid(mod3_r))
 plotFitted(mod3_r,lambda,data,'FA')
 
 ```
@@ -233,16 +233,13 @@ mod3_r=stepAIC(mod3)
 
 summary(mod3_r)
 plot(mod3_r)
-#heteroskedasticita rezidui?
-
-#plotFitted(mod3_r,lambda,data[data$lat=='R',]$loc_num,data[data$lat=='R',]$ADC,'ADC')
-  plotFitted(mod3_r,lambda,data,'ADC')
+hist(resid(mod3_r))
+plotFitted(mod3_r,lambda,data,'ADC')
 
 mod2_r=stepAIC(mod2)
 summary(mod2_r)
 plot(mod2_r)
-
-#plotFitted(mod2_r,lambda,data[data$lat=='R',]$loc_num,data[data$lat=='R',]$ADC,'ADC')
+hist(resid(mod2_r))
 plotFitted(mod2_r,lambda,data,'ADC')
 
 ```
@@ -251,7 +248,7 @@ plotFitted(mod2_r,lambda,data,'ADC')
 
 ```{r,echo=FALSE}
 
-lambda=findLambda(data,data$ADC)
+lambda=findLambda(data,data$ADC,c(seq(-10,-1/20,1/20),seq(1/20,10,1/20)))
 print(lambda)
 
 data_t=data
@@ -270,16 +267,13 @@ mod3_r=stepAIC(mod3)
 
 summary(mod3_r)
 plot(mod3_r)
-#heteroskedasticita rezidui?
-
-#plotFitted(mod3_r,lambda,data[data$lat=='R',]$loc_num,data[data$lat=='R',]$ADC,'ADC')
+hist(resid(mod3_r))
   plotFitted(mod3_r,lambda,data,'ADC')
 
 mod2_r=stepAIC(mod2)
 summary(mod2_r)
 plot(mod2_r)
-
-#plotFitted(mod2_r,lambda,data[data$lat=='R',]$loc_num,data[data$lat=='R',]$ADC,'ADC')
+hist(resid(mod2_r))
 plotFitted(mod2_r,lambda,data,'ADC')
 
 ```
@@ -288,7 +282,7 @@ plotFitted(mod2_r,lambda,data,'ADC')
 
 ```{r,echo=FALSE}
 
-lambda=findLambda_quad(data,data$ADC)
+lambda=findLambda_quad(data,data$ADC,c(seq(-10,-1/20,1/20),seq(1/20,10,1/20)))
 print(lambda)
 
 data_t=data
@@ -307,16 +301,13 @@ mod3_r=stepAIC(mod3)
 
 summary(mod3_r)
 plot(mod3_r)
-#heteroskedasticita rezidui?
-
-#plotFitted(mod3_r,lambda,data[data$lat=='R',]$loc_num,data[data$lat=='R',]$ADC,'ADC')
+hist(resid(mod3_r))
   plotFitted(mod3_r,lambda,data,'ADC')
 
 mod2_r=stepAIC(mod2)
 summary(mod2_r)
 plot(mod2_r)
-
-#plotFitted(mod2_r,lambda,data[data$lat=='R',]$loc_num,data[data$lat=='R',]$ADC,'ADC')
+hist(resid(mod2_r))
 plotFitted(mod2_r,lambda,data,'ADC')
 
 ```
@@ -329,7 +320,9 @@ Signifikantní lateralita
 
 Signifikantní věk (je to na hraně signifikance, neprošlo by to korekcí na multiple comparisons)
 
-Ten model se mi moc nelíbí, ale nevím již jak jej vylepšit. Nejsem si jistý tou kvadratickou závislostí
+Ten model se mi stále moc nelíbí.
+Tato nová optimizace nezlepšila symetrii, nepodařilo se najít takové lambda, aby byla normalita reziduí, v celém hledaném rozsahu lambda jsou všude signifikatní Shapiro-Wilkovy testy. Navíc, díky tomu, že tam teoreticky figuruje i ta kvadratická závislost, kterou bych chtěl potvrdit nebo vyvrátit, není mi jasné, z jakého modelu mám vycházet při hledání lambda. Z lineárního nebo kvadratického? Tady je to pak bloudění v kruhu....
+
 
 NQA
 ---
@@ -357,9 +350,7 @@ mod3_r=stepAIC(mod3)
 
 summary(mod3_r)
 plot(mod3_r)
-
-#plotFitted(mod3_r,lambda,data[data$lat=='R',]$loc_num,data[data$lat=='R',]$NQA,'NQA')
-
+hist(resid(mod3_r))
 plotFitted(mod3_r,lambda,data,'NQA')
 
 ```
@@ -386,9 +377,7 @@ mod3_r=stepAIC(mod3)
 
 summary(mod3_r)
 plot(mod3_r)
-
-#plotFitted(mod3_r,lambda,data[data$lat=='R',]$loc_num,data[data$lat=='R',]$NQA,'NQA')
-
+hist(resid(mod3_r))
 plotFitted(mod3_r,lambda,data,'NQA')
 
 ```
@@ -422,18 +411,27 @@ mod3=lme(GFA~loc_num*lat*age_c,random=~1|id,data_t,method="ML")
 mod4=lme(GFA~(loc_num+lat+age_c)^2,random=~1|id,data_t,method="ML")
 mod5=lme(GFA~loc_num+lat+age_c,random=~1|id,data_t,method="ML")
 mod6=lme(GFA~lat+age_c,random=~1|id,data_t,method="ML")
+mod7=lme(GFA~age_c,random=~1|id,data_t,method="ML")
+mod8=lme(GFA~lat,random=~1|id,data_t,method="ML")
+mod9=lme(GFA~1,random=~1|id,data_t,method="ML")
+anova(mod1,mod2,mod3,mod4,mod5,mod6,mod7)
+anova(mod6,mod8)
+anova(mod7,mod9)
+anova(mod8,mod9)
 
-anova(mod1,mod2,mod3,mod4,mod5,mod6)
-anova(mod5,mod6)
-
-
-mod3_r=stepAIC(mod3)
-#nezjednodusuje se
+mod3_r=stepAIC(mod3 )
+#nezjednodusuje se - proc?
 
 summary(mod3)
 plot(mod3)
-
+hist(resid(mod3))
 plotFitted(mod3,lambda,data,'GFA')
+
+summary(mod8)
+plot(mod8)
+hist(resid(mod8))
+plotFitted(mod8,lambda,data,'GFA')
+
 ```
 
 *b) Shapiro-Wilk LME
@@ -454,18 +452,27 @@ mod3=lme(GFA~loc_num*lat*age_c,random=~1|id,data_t,method="ML")
 mod4=lme(GFA~(loc_num+lat+age_c)^2,random=~1|id,data_t,method="ML")
 mod5=lme(GFA~loc_num+lat+age_c,random=~1|id,data_t,method="ML")
 mod6=lme(GFA~lat+age_c,random=~1|id,data_t,method="ML")
-
-anova(mod1,mod2,mod3,mod4,mod5,mod6)
-anova(mod5,mod6)
-
+mod7=lme(GFA~age_c,random=~1|id,data_t,method="ML")
+mod8=lme(GFA~lat,random=~1|id,data_t,method="ML")
+mod9=lme(GFA~1,random=~1|id,data_t,method="ML")
+anova(mod1,mod2,mod3,mod4,mod5,mod6,mod7)
+anova(mod6,mod8)
+anova(mod7,mod9)
+anova(mod8,mod9)
 
 mod3_r=stepAIC(mod3)
-#nezjednodusuje se
+#nezjednodusuje se - proc?
 
 summary(mod3)
 plot(mod3)
-
+hist(resid(mod3))
 plotFitted(mod3,lambda,data,'GFA')
+
+summary(mod8)
+plot(mod8)
+hist(resid(mod8))
+plotFitted(mod8,lambda,data,'GFA')
+
 ```
 
 ***Závěr:***
