@@ -26,11 +26,13 @@ FA, ADC, NQA, GFA
 
 Zjednodušování modelu - Akaike information criterion, likelihood ratio tests
 
+BoxCox transformace, lambda určena a) fcí bc (boxCox for LM), b) maximalizací p-hodnoty Shapiro-wilk testu reziduí LME
+
 Výsledky
 ========
 
-FA
---
+Boxplots
+--------
 
 ```{r,echo=FALSE}
 library(car)
@@ -92,6 +94,32 @@ findLambda = function(data,response,lambdaRange=seq(1/20,2,1/20)){
   return(lambdaOpt)
 }
 
+findLambda_quad = function(data,response,lambdaRange=seq(1/20,2,1/20)){
+  
+  #Box-Cox trpi obecne tim, ze nepracuje s nahodnym efektem. Venca doporucuje u LME zkusit udelat cyklus pres ruzne lambda a spocitat p-value Shapiro-Wilkova testu normality residui - meritko optimality (resid(mod), bez parametru)
+  
+  pvalOpt=0
+  #lambdaRange=seq(1/20,2,1/20)
+  lambdaOpt=lambdaRange[1]
+  ind=1
+  pval=vector()
+  for ( lambda in lambdaRange){
+   # print(lambdaOpt)
+    data_t=data
+    data_t$transfResponse = (response^(lambda)-1)/lambda
+    #mod=lme(FA~loc_num*lat*age_c,random=~1|id,data_t,method="ML")
+    mod=lme(transfResponse~loc_num*lat*age_c+I(loc_num^2)*lat*age_c,random=~1|id,data_t,method="ML")    
+    pval[ind]=shapiro.test(resid(mod))$p.value
+    if (pvalOpt < pval[ind]) {
+      pvalOpt=pval[ind]
+      lambdaOpt=lambda
+    }
+    ind=ind+1
+  }
+  plot(lambdaRange,pval,type='l')
+  return(lambdaOpt)
+}
+
 data=read.delim("PLS_14_contr_stat_forR3.csv",sep=";")
 data$loc_num=as.integer(data$loc)
 data$age_c=data$age-mean(data$age)
@@ -102,13 +130,19 @@ Boxplot(ADC~loc*lat,data,labels=id,id.method='n')
 Boxplot(NQA~loc*lat,data,labels=id,id.method='n')
 Boxplot(GFA~loc*lat,data,labels=id,id.method='n')
 
+```
+
+FA
+--
+
+*a) lambda - boxCox LM
+
+```{r,echo=FALSE}
+
 bc=boxcox(FA~loc*lat*age_c,data=data,lambda=seq(0,1,1/20))
 #bc=boxcox(FA~loc_num*lat*age_c*I(loc_num^2),data=data,lambda=seq(0,1,1/20))
 
 lambda=bc$x[which.max(bc$y)]
-print(lambda)
-
-lambda=findLambda(data,data$FA)
 print(lambda)
 
 data_t=data
@@ -134,6 +168,34 @@ plotFitted(mod3_r,lambda,data,'FA')
    
 ```
 
+*b) lambda - Shapiro-Wilk LME
+
+```{r,echo=FALSE}
+lambda=findLambda(data,data$FA)
+print(lambda)
+data_t=data
+data_t$FA = (data$FA^(lambda)-1)/lambda
+
+mod1=lme(FA~loc_num*lat*age_c+I(loc_num^2)*lat*age_c+I(loc_num^3)*lat*age_c,random=~1|id,data_t,method="ML")
+mod2=lme(FA~loc_num*lat*age_c+I(loc_num^2)*lat*age_c,random=~1|id,data_t,method="ML")
+mod3=lme(FA~loc_num*lat*age_c,random=~1|id,data_t,method="ML")
+mod4=lme(FA~lat*age_c,random=~1|id,data_t,method="ML")
+
+anova(mod1,mod2,mod3,mod4)
+
+#z hlediska locality nevysvetluje vice mocnina loc_num, staci linearni
+#dalsi zjednoduseni modelu
+
+mod3_r=stepAIC(mod3)
+
+summary(mod3_r)
+#diagnostika - to model se zdá snad v pořádku
+plot(mod3_r)
+
+plotFitted(mod3_r,lambda,data,'FA')
+
+```
+
 ***Závěr:***
 
 Signifikantní efekt pozice (loc_num) - lineární
@@ -141,9 +203,10 @@ Signifikantní efekt pozice (loc_num) - lineární
 Signifikantní lateralita, v interakci s věkem
 
 
-
 ADC
 ---
+
+*a) lambda - boxCox LM
 
 ```{r,echo=FALSE}
 
@@ -154,7 +217,78 @@ bc=boxcox(ADC~loc*lat*age_c,data=data,lambda=seq(0,1,1/20))
 lambda=bc$x[which.max(bc$y)]
 print(lambda)
 
+data_t=data
+data_t$ADC = (data$ADC^(lambda)-1)/lambda
+
+mod1=lme(ADC~loc_num*lat*age_c+I(loc_num^2)*lat*age_c+I(loc_num^3)*lat*age_c,random=~1|id,data_t,method="ML")
+mod2=lme(ADC~loc_num*lat*age_c+I(loc_num^2)*lat*age_c,random=~1|id,data_t,method="ML")
+mod3=lme(ADC~loc_num*lat*age_c,random=~1|id,data_t,method="ML")
+mod4=lme(ADC~lat*age_c,random=~1|id,data_t,method="ML")
+
+anova(mod1,mod2,mod3,mod4)
+
+#tady je potreba i mocnina??
+
+mod3_r=stepAIC(mod3)
+
+summary(mod3_r)
+plot(mod3_r)
+#heteroskedasticita rezidui?
+
+#plotFitted(mod3_r,lambda,data[data$lat=='R',]$loc_num,data[data$lat=='R',]$ADC,'ADC')
+  plotFitted(mod3_r,lambda,data,'ADC')
+
+mod2_r=stepAIC(mod2)
+summary(mod2_r)
+plot(mod2_r)
+
+#plotFitted(mod2_r,lambda,data[data$lat=='R',]$loc_num,data[data$lat=='R',]$ADC,'ADC')
+plotFitted(mod2_r,lambda,data,'ADC')
+
+```
+
+*b) lambda - Shapiro-Wilk LME - lineární
+
+```{r,echo=FALSE}
+
 lambda=findLambda(data,data$ADC)
+print(lambda)
+
+data_t=data
+data_t$ADC = (data$ADC^(lambda)-1)/lambda
+
+mod1=lme(ADC~loc_num*lat*age_c+I(loc_num^2)*lat*age_c+I(loc_num^3)*lat*age_c,random=~1|id,data_t,method="ML")
+mod2=lme(ADC~loc_num*lat*age_c+I(loc_num^2)*lat*age_c,random=~1|id,data_t,method="ML")
+mod3=lme(ADC~loc_num*lat*age_c,random=~1|id,data_t,method="ML")
+mod4=lme(ADC~lat*age_c,random=~1|id,data_t,method="ML")
+
+anova(mod1,mod2,mod3,mod4)
+
+#tady je potreba i mocnina??
+
+mod3_r=stepAIC(mod3)
+
+summary(mod3_r)
+plot(mod3_r)
+#heteroskedasticita rezidui?
+
+#plotFitted(mod3_r,lambda,data[data$lat=='R',]$loc_num,data[data$lat=='R',]$ADC,'ADC')
+  plotFitted(mod3_r,lambda,data,'ADC')
+
+mod2_r=stepAIC(mod2)
+summary(mod2_r)
+plot(mod2_r)
+
+#plotFitted(mod2_r,lambda,data[data$lat=='R',]$loc_num,data[data$lat=='R',]$ADC,'ADC')
+plotFitted(mod2_r,lambda,data,'ADC')
+
+```
+
+*b) lambda - Shapiro-Wilk LME - kvadratický
+
+```{r,echo=FALSE}
+
+lambda=findLambda_quad(data,data$ADC)
 print(lambda)
 
 data_t=data
@@ -200,12 +334,40 @@ Ten model se mi moc nelíbí, ale nevím již jak jej vylepšit. Nejsem si jist�
 NQA
 ---
 
+*a) lambda - boxCox LM
+
 ```{r,echo=FALSE}
 #NQA
 bc=boxcox(NQA~loc*lat*age_c,data=data,lambda=seq(-1,1,1/20))
 
 lambda=bc$x[which.max(bc$y)]
 print(lambda)
+
+data_t=data
+data_t$NQA = (data$NQA^(lambda)-1)/lambda
+
+mod1=lme(NQA~loc_num*lat*age_c+I(loc_num^2)*lat*age_c+I(loc_num^3)*lat*age_c,random=~1|id,data_t,method="ML")
+mod2=lme(NQA~loc_num*lat*age_c+I(loc_num^2)*lat*age_c,random=~1|id,data_t,method="ML")
+mod3=lme(NQA~loc_num*lat*age_c,random=~1|id,data_t,method="ML")
+mod4=lme(NQA~lat*age_c,random=~1|id,data_t,method="ML")
+
+anova(mod1,mod2,mod3,mod4)
+
+mod3_r=stepAIC(mod3)
+
+summary(mod3_r)
+plot(mod3_r)
+
+#plotFitted(mod3_r,lambda,data[data$lat=='R',]$loc_num,data[data$lat=='R',]$NQA,'NQA')
+
+plotFitted(mod3_r,lambda,data,'NQA')
+
+```
+
+*b) Shapiro-Wilk LME
+
+```{r,echo=FALSE}
+
 
 lambda=findLambda(data,data$NQA)
 print(lambda)
@@ -219,8 +381,6 @@ mod3=lme(NQA~loc_num*lat*age_c,random=~1|id,data_t,method="ML")
 mod4=lme(NQA~lat*age_c,random=~1|id,data_t,method="ML")
 
 anova(mod1,mod2,mod3,mod4)
-
-
 
 mod3_r=stepAIC(mod3)
 
@@ -241,6 +401,8 @@ Signifikantní pozice
 GFA
 ---
 
+*a) BoxCox LM
+
 ```{r,echo=FALSE}
 
 #GFA
@@ -251,6 +413,34 @@ lambda=bc$x[which.max(bc$y)]
 
 print(lambda)
 
+data_t=data
+data_t$GFA = (data$GFA^(lambda)-1)/lambda
+
+mod1=lme(GFA~loc_num*lat*age_c+I(loc_num^2)*lat*age_c+I(loc_num^3)*lat*age_c,random=~1|id,data_t,method="ML")
+mod2=lme(GFA~loc_num*lat*age_c+I(loc_num^2)*lat*age_c,random=~1|id,data_t,method="ML")
+mod3=lme(GFA~loc_num*lat*age_c,random=~1|id,data_t,method="ML")
+mod4=lme(GFA~(loc_num+lat+age_c)^2,random=~1|id,data_t,method="ML")
+mod5=lme(GFA~loc_num+lat+age_c,random=~1|id,data_t,method="ML")
+mod6=lme(GFA~lat+age_c,random=~1|id,data_t,method="ML")
+
+anova(mod1,mod2,mod3,mod4,mod5,mod6)
+anova(mod5,mod6)
+
+
+mod3_r=stepAIC(mod3)
+#nezjednodusuje se
+
+summary(mod3)
+plot(mod3)
+
+plotFitted(mod3,lambda,data,'GFA')
+```
+
+*b) Shapiro-Wilk LME
+
+```{r,echo=FALSE}
+
+#GFA
 lambda=findLambda(data,data$GFA,seq(1/20,20,1/20))
 print(lambda)
 
