@@ -246,6 +246,12 @@ plotFitted(mod2_r,lambda,data,'ADC')
 
 *b) lambda - Shapiro-Wilk LME - lineární
 
+Doplněna diagnostika outlierů
+
+Po vyřazení 4 outlierů s podezřelými hodnotami dochází k normalizaci reziduí
+
+Kvadratická závislost tam přetrvává
+
 ```{r,echo=FALSE}
 
 lambda=findLambda(data,data$ADC,c(seq(-10,-1/20,1/20),seq(1/20,10,1/20)))
@@ -268,13 +274,38 @@ mod3_r=stepAIC(mod3)
 summary(mod3_r)
 plot(mod3_r)
 hist(resid(mod3_r))
+qqnorm(resid(mod3_r))
   plotFitted(mod3_r,lambda,data,'ADC')
+plot(mod3_r,resid(.)~fitted(.)|lat)
+#napovida o outlierech - jsou jen na jedne strane!
+plot(mod3_r,resid(.)~fitted(.)|lat)
+data[which(as.vector(resid(mod3_r))< -0.5),]
 
-mod2_r=stepAIC(mod2)
-summary(mod2_r)
-plot(mod2_r)
-hist(resid(mod2_r))
-plotFitted(mod2_r,lambda,data,'ADC')
+
+#bez outlieru
+data_p=data[-c(25,85,115,123),]
+
+lambda=findLambda(data_p,data_p$ADC,c(seq(-10,-1/20,1/20),seq(1/20,10,1/20)))
+print(lambda)
+data_p_t=data_p
+data_p_t$ADC = (data_p$ADC^(lambda)-1)/lambda
+mod1_p=lme(ADC~loc_num*lat*age_c+I(loc_num^2)*lat*age_c+I(loc_num^3)*lat*age_c,random=~1|id,data_p_t,method="ML")
+mod2_p=lme(ADC~loc_num*lat*age_c+I(loc_num^2)*lat*age_c,random=~1|id,data_p_t,method="ML")
+mod3_p=lme(ADC~loc_num*lat*age_c,random=~1|id,data_p_t,method="ML")
+mod4_p=lme(ADC~lat*age_c,random=~1|id,data_p_t,method="ML")
+
+anova(mod1_p,mod2_p,mod3_p,mod4_p)
+
+plot(mod3_p)
+mod3_p_r=stepAIC(mod3_p)
+plot(mod3_p_r)
+plotFitted(mod3_p_r,lambda,data,'ADC')
+
+mod2_p_r=stepAIC(mod2_p)
+summary(mod2_p_r)
+plot(mod2_p_r)
+hist(resid(mod2_p_r))
+plotFitted(mod2_p_r,lambda,data,'ADC')
 
 ```
 
