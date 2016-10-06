@@ -1,6 +1,6 @@
 ---
 title: "Periferní nervy - statistická analýza"
-output: html_document
+output: pdf_document
 ---
 
 Metody
@@ -56,7 +56,8 @@ origData_x_L=data[data$lat=='L',]$loc_num
 origData_y_R=eval(parse(text=paste("data[data$lat=='R',]$",ylabel,sep="")))
 origData_y_L=eval(parse(text=paste("data[data$lat=='L',]$",ylabel,sep="")))
 
-plot(x,y_pred_unTransf,type='l',col='red',ylim=range(c(origData_y_R,origData_y_L)),ylab=ylabel,xlab='Locality')
+plot(x,y_pred_unTransf,type='l',col='red',ylim=range(c(origData_y_R,origData_y_L)),ylab=ylabel,xlab='Locality',xaxt='n')
+axis(1,at=c(1,2,3,4,5),labels=c('L3','L4','L5','S1','S2'))
 
 y_pred=predict(mod,level=0,data.frame(age_c=0,lat='L',loc_num=x))
 y_pred_unTransf=(y_pred*lambda + 1)^(1/lambda)
@@ -68,7 +69,7 @@ points(origData_x_L,origData_y_L,col='green')
 
 }
 
-findLambda = function(data,response,lambdaRange=seq(1/20,2,1/20)){
+findLambda = function(data,response,lambdaRange=seq(1/20,2,1/20),method){
   
   #Box-Cox trpi obecne tim, ze nepracuje s nahodnym efektem. Venca doporucuje u LME zkusit udelat cyklus pres ruzne lambda a spocitat p-value Shapiro-Wilkova testu normality residui - meritko optimality (resid(mod), bez parametru)
   
@@ -82,7 +83,16 @@ findLambda = function(data,response,lambdaRange=seq(1/20,2,1/20)){
     data_t=data
     data_t$transfResponse = (response^(lambda)-1)/lambda
     #mod=lme(FA~loc_num*lat*age_c,random=~1|id,data_t,method="ML")
+    if (method=='linear'){
     mod=lme(transfResponse~loc_num*lat*age_c,random=~1|id,data_t,method="ML")    
+    }
+    else if (method=='quadratic'){
+    mod=lme(transfResponse~loc_num*lat*age_c+I(loc_num^2)*lat*age_c,random=~1|id,data_t,method="ML") 
+      }
+    else {
+      stop(paste('ERROR: parameter method: ',method,' unknown.',sep=""))
+           }
+    
     pval[ind]=shapiro.test(resid(mod))$p.value
     if (pvalOpt < pval[ind]) {
       pvalOpt=pval[ind]
@@ -94,31 +104,6 @@ findLambda = function(data,response,lambdaRange=seq(1/20,2,1/20)){
   return(lambdaOpt)
 }
 
-findLambda_quad = function(data,response,lambdaRange=seq(1/20,2,1/20)){
-  
-  #Box-Cox trpi obecne tim, ze nepracuje s nahodnym efektem. Venca doporucuje u LME zkusit udelat cyklus pres ruzne lambda a spocitat p-value Shapiro-Wilkova testu normality residui - meritko optimality (resid(mod), bez parametru)
-  
-  pvalOpt=0
-  #lambdaRange=seq(1/20,2,1/20)
-  lambdaOpt=lambdaRange[1]
-  ind=1
-  pval=vector()
-  for ( lambda in lambdaRange){
-   # print(lambdaOpt)
-    data_t=data
-    data_t$transfResponse = (response^(lambda)-1)/lambda
-    #mod=lme(FA~loc_num*lat*age_c,random=~1|id,data_t,method="ML")
-    mod=lme(transfResponse~loc_num*lat*age_c+I(loc_num^2)*lat*age_c,random=~1|id,data_t,method="ML")    
-    pval[ind]=shapiro.test(resid(mod))$p.value
-    if (pvalOpt < pval[ind]) {
-      pvalOpt=pval[ind]
-      lambdaOpt=lambda
-    }
-    ind=ind+1
-  }
-  plot(lambdaRange,pval,type='l')
-  return(lambdaOpt)
-}
 
 data=read.delim("PLS_14_contr_stat_forR3.csv",sep=";")
 data$loc_num=as.integer(data$loc)
@@ -132,10 +117,11 @@ Boxplot(GFA~loc*lat,data,labels=id,id.method='n')
 
 ```
 
-FA
---
+# 1. Model 1 - full data / data s vyřazením jednotlivých 4 vybočujících hodnot
 
-*a) lambda - boxCox LM
+## FA
+
+### a) lambda - boxCox LM
 
 ```{r,echo=FALSE}
 
@@ -168,10 +154,10 @@ plotFitted(mod3_r,lambda,data,'FA')
    
 ```
 
-*b) lambda - Shapiro-Wilk LME
+### b) lambda - Shapiro-Wilk LME
 
 ```{r,echo=FALSE}
-lambda=findLambda(data,data$FA)
+lambda=findLambda(data,data$FA,method='linear')
 print(lambda)
 data_t=data
 data_t$FA = (data$FA^(lambda)-1)/lambda
@@ -203,10 +189,10 @@ Signifikantní efekt pozice (loc_num) - lineární
 Signifikantní lateralita, v interakci s věkem
 
 
-ADC
----
+## ADC
 
-*a) lambda - boxCox LM
+
+### a) lambda - boxCox LM
 
 ```{r,echo=FALSE}
 
@@ -244,7 +230,7 @@ plotFitted(mod2_r,lambda,data,'ADC')
 
 ```
 
-*b) lambda - Shapiro-Wilk LME - lineární
+### b) lambda - Shapiro-Wilk LME - lineární
 
 Doplněna diagnostika outlierů
 
@@ -254,7 +240,7 @@ Kvadratická závislost tam přetrvává
 
 ```{r,echo=FALSE}
 
-lambda=findLambda(data,data$ADC,c(seq(-10,-1/20,1/20),seq(1/20,10,1/20)))
+lambda=findLambda(data,data$ADC,c(seq(-10,-1/20,1/20),seq(1/20,10,1/20)),'linear')
 print(lambda)
 
 data_t=data
@@ -285,7 +271,7 @@ data[which(as.vector(resid(mod3_r))< -0.5),]
 #bez outlieru
 data_p=data[-c(25,85,115,123),]
 
-lambda=findLambda(data_p,data_p$ADC,c(seq(-10,-1/20,1/20),seq(1/20,10,1/20)))
+lambda=findLambda(data_p,data_p$ADC,c(seq(-10,-1/20,1/20),seq(1/20,10,1/20)),'linear')
 print(lambda)
 data_p_t=data_p
 data_p_t$ADC = (data_p$ADC^(lambda)-1)/lambda
@@ -309,11 +295,11 @@ plotFitted(mod2_p_r,lambda,data,'ADC')
 
 ```
 
-*b) lambda - Shapiro-Wilk LME - kvadratický
+### b) lambda - Shapiro-Wilk LME - kvadratický
 
 ```{r,echo=FALSE}
 
-lambda=findLambda_quad(data,data$ADC,c(seq(-10,-1/20,1/20),seq(1/20,10,1/20)))
+lambda=findLambda(data,data$ADC,c(seq(-10,-1/20,1/20),seq(1/20,10,1/20)),'quadratic')
 print(lambda)
 
 data_t=data
@@ -351,14 +337,13 @@ Signifikantní lateralita
 
 Signifikantní věk (je to na hraně signifikance, neprošlo by to korekcí na multiple comparisons)
 
-Ten model se mi stále moc nelíbí.
-Tato nová optimizace nezlepšila symetrii, nepodařilo se najít takové lambda, aby byla normalita reziduí, v celém hledaném rozsahu lambda jsou všude signifikatní Shapiro-Wilkovy testy. Navíc, díky tomu, že tam teoreticky figuruje i ta kvadratická závislost, kterou bych chtěl potvrdit nebo vyvrátit, není mi jasné, z jakého modelu mám vycházet při hledání lambda. Z lineárního nebo kvadratického? Tady je to pak bloudění v kruhu....
+Ukázalo se, že problém jsou ty 4 konkrétní vybočující hodnoty. Pokud by se vyřadily, rezidua budou OK.
+Konzultace s Vencou Čapkem - vyřadit je, pouze pokud existuje důvod je vyřadit.
+Konzultace s Ibrahimem - jsou tam protruze, plný moč. měchýř - vyřadíme celá data těchto subjektů
 
+## NQA
 
-NQA
----
-
-*a) lambda - boxCox LM
+### a) lambda - boxCox LM
 
 ```{r,echo=FALSE}
 #NQA
@@ -386,12 +371,12 @@ plotFitted(mod3_r,lambda,data,'NQA')
 
 ```
 
-*b) Shapiro-Wilk LME
+### b) Shapiro-Wilk LME
 
 ```{r,echo=FALSE}
 
 
-lambda=findLambda(data,data$NQA)
+lambda=findLambda(data,data$NQA,method='linear')
 print(lambda)
 
 data_t=data
@@ -409,6 +394,7 @@ mod3_r=stepAIC(mod3)
 summary(mod3_r)
 plot(mod3_r)
 hist(resid(mod3_r))
+cat('\n')
 plotFitted(mod3_r,lambda,data,'NQA')
 
 ```
@@ -418,10 +404,9 @@ plotFitted(mod3_r,lambda,data,'NQA')
 Signifikantní pozice
 
 
-GFA
----
+## GFA
 
-*a) BoxCox LM
+### a) BoxCox LM
 
 ```{r,echo=FALSE}
 
@@ -465,12 +450,12 @@ plotFitted(mod8,lambda,data,'GFA')
 
 ```
 
-*b) Shapiro-Wilk LME
+### b) Shapiro-Wilk LME
 
 ```{r,echo=FALSE}
 
 #GFA
-lambda=findLambda(data,data$GFA,seq(1/20,20,1/20))
+lambda=findLambda(data,data$GFA,seq(1/20,20,1/20),'linear')
 print(lambda)
 
 
@@ -509,3 +494,7 @@ plotFitted(mod8,lambda,data,'GFA')
 ***Závěr:***
 
 Zde vypadá, že není nic signifikantní
+
+6.10.2016
+
+# Model 2 s vyřazením 4 subjektů, u kterých jsou pozorovány outliery 
