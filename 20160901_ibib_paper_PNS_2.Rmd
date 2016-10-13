@@ -1,6 +1,8 @@
 ---
 title: "Periferní nervy - statistická analýza"
-output: pdf_document
+output: 
+  pdf_document: 
+    keep_tex: yes
 ---
 
 Metody
@@ -44,7 +46,7 @@ plotFitted = function(mod,lambda,data,ylabel){
   #plot experimentalnich dat a predikce pro kazdou stranu zvlast, barevne odlisne
   #predikce pro prumerne hodnoty veku
   #confidence intervals - neni obecna shoda mezi teoret. statistiky, jak to delat, jedna moznost je lmertest lmertools - reprezentuje jednu vetev teoretiku
-  
+  par(mar=c(5,4,2,2)+0.1)
   x=seq(1,5,0.1)
 y_pred=predict(mod,level=0,data.frame(age_c=0,lat='R',loc_num=x))
 
@@ -498,3 +500,175 @@ Zde vypadá, že není nic signifikantní
 6.10.2016
 
 # Model 2 s vyřazením 4 subjektů, u kterých jsou pozorovány outliery 
+
+```{r,echo=FALSE}
+#vyrazeni
+data_r=data[-which.names(c('3_MM_F_26y','9_KM_33y','12_FJ_37y','13_KR_39y'),data$id),]
+```
+
+## FA - Shapiro-Wilk LME
+
+```{r,echo=FALSE}
+
+lambda=findLambda(data_r,data_r$FA,method='linear')
+print(lambda)
+data_t=data_r
+data_t$FA = (data_r$FA^(lambda)-1)/lambda
+
+mod1=lme(FA~loc_num*lat*age_c+I(loc_num^2)*lat*age_c+I(loc_num^3)*lat*age_c,random=~1|id,data_t,method="ML")
+mod2=lme(FA~loc_num*lat*age_c+I(loc_num^2)*lat*age_c,random=~1|id,data_t,method="ML")
+mod3=lme(FA~loc_num*lat*age_c,random=~1|id,data_t,method="ML")
+mod4=lme(FA~lat*age_c,random=~1|id,data_t,method="ML")
+
+anova(mod1,mod2,mod3,mod4)
+
+#z hlediska locality nevysvetluje vice mocnina loc_num, staci linearni
+#dalsi zjednoduseni modelu
+
+mod3_r=stepAIC(mod3)
+
+summary(mod3_r)
+#diagnostika - to model se zdá snad v pořádku
+plot(mod3_r)
+hist(resid(mod3_r))
+cat("\n")
+plotFitted(mod3_r,lambda,data,'FA')
+legend('topright',c('right','left'),pch=c(1,1),col=c(2,3))
+```
+
+***Závěr:***
+
+## ADC
+
+### Lineární
+
+```{r,echo=FALSE}
+
+lambda=findLambda(data_r,data_r$ADC,c(seq(-10,-1/20,1/20),seq(1/20,10,1/20)),method='linear')
+print(lambda)
+data_t=data_r
+data_t$ADC = (data_r$ADC^(lambda)-1)/lambda
+
+mod1=lme(ADC~loc_num*lat*age_c+I(loc_num^2)*lat*age_c+I(loc_num^3)*lat*age_c,random=~1|id,data_t,method="ML")
+mod2=lme(ADC~loc_num*lat*age_c+I(loc_num^2)*lat*age_c,random=~1|id,data_t,method="ML")
+mod3=lme(ADC~loc_num*lat*age_c,random=~1|id,data_t,method="ML")
+mod4=lme(ADC~lat*age_c,random=~1|id,data_t,method="ML")
+
+anova(mod1,mod2,mod3,mod4)
+
+mod3_r=stepAIC(mod3)
+
+summary(mod3_r)
+#diagnostika - to model se zdá snad v pořádku
+plot(mod3_r)
+hist(resid(mod3_r))
+```
+
+```{r,echo=FALSE}
+plotFitted(mod3_r,lambda,data,'ADC')
+
+```
+
+### Kvadratický
+
+```{r,echo=FALSE}
+
+lambda=findLambda(data_r,data_r$ADC,c(seq(-10,-1/20,1/20),seq(1/20,10,1/20)),method='quadratic')
+print(lambda)
+data_t=data_r
+data_t$ADC = (data_r$ADC^(lambda)-1)/lambda
+
+mod1=lme(ADC~loc_num*lat*age_c+I(loc_num^2)*lat*age_c+I(loc_num^3)*lat*age_c,random=~1|id,data_t,method="ML")
+mod2=lme(ADC~loc_num*lat*age_c+I(loc_num^2)*lat*age_c,random=~1|id,data_t,method="ML")
+mod3=lme(ADC~loc_num*lat*age_c,random=~1|id,data_t,method="ML")
+mod4=lme(ADC~lat*age_c,random=~1|id,data_t,method="ML")
+
+anova(mod1,mod2,mod3,mod4)
+
+mod2_r=stepAIC(mod2)
+
+summary(mod2_r)
+
+plot(mod2_r)
+hist(resid(mod2_r))
+```
+
+```{r,echo=FALSE}
+plotFitted(mod2_r,lambda,data,'ADC')
+legend('topleft',c('right','left'),pch=c(1,1),col=c(2,3))
+```
+
+***Závěr:***
+
+## NQA
+
+```{r,echo=FALSE}
+
+lambda=findLambda(data_r,data_r$NQA,method='linear')
+print(lambda)
+data_t=data_r
+data_t$NQA = (data_r$NQA^(lambda)-1)/lambda
+
+mod1=lme(NQA~loc_num*lat*age_c+I(loc_num^2)*lat*age_c+I(loc_num^3)*lat*age_c,random=~1|id,data_t,method="ML")
+mod2=lme(NQA~loc_num*lat*age_c+I(loc_num^2)*lat*age_c,random=~1|id,data_t,method="ML")
+mod3=lme(NQA~loc_num*lat*age_c,random=~1|id,data_t,method="ML")
+mod4=lme(NQA~lat*age_c,random=~1|id,data_t,method="ML")
+
+anova(mod1,mod2,mod3,mod4)
+
+#z hlediska locality nevysvetluje vice mocnina loc_num, staci linearni
+#dalsi zjednoduseni modelu
+
+mod3_r=stepAIC(mod3)
+
+summary(mod3_r)
+#diagnostika - to model se zdá snad v pořádku
+plot(mod3_r)
+hist(resid(mod3_r))
+```
+
+```{r,echo=FALSE}
+cat('\n')
+plotFitted(mod3_r,lambda,data,'NQA')
+legend('topleft',c('right','left'),pch=c(1,1),col=c(2,3))
+```
+
+***Závěr:***
+
+## GFA
+
+```{r,echo=FALSE}
+
+lambda=findLambda(data_r,data_r$GFA,seq(1/20,20,1/20),method='linear')
+print(lambda)
+data_t=data_r
+data_t$GFA = (data_r$GFA^(lambda)-1)/lambda
+
+mod1=lme(GFA~loc_num*lat*age_c+I(loc_num^2)*lat*age_c+I(loc_num^3)*lat*age_c,random=~1|id,data_t,method="ML")
+mod2=lme(GFA~loc_num*lat*age_c+I(loc_num^2)*lat*age_c,random=~1|id,data_t,method="ML")
+mod3=lme(GFA~loc_num*lat*age_c,random=~1|id,data_t,method="ML")
+mod4=lme(GFA~(loc_num+lat+age_c)^2,random=~1|id,data_t,method="ML")
+mod5=lme(GFA~loc_num+lat+age_c,random=~1|id,data_t,method="ML")
+mod6=lme(GFA~lat+age_c,random=~1|id,data_t,method="ML")
+mod7=lme(GFA~age_c,random=~1|id,data_t,method="ML")
+mod8=lme(GFA~lat,random=~1|id,data_t,method="ML")
+mod9=lme(GFA~1,random=~1|id,data_t,method="ML")
+anova(mod1,mod2,mod3,mod4,mod5,mod6,mod7)
+anova(mod6,mod8)
+anova(mod7,mod9)
+anova(mod8,mod9)
+
+mod3_r=stepAIC(mod3)
+#nezjednodusuje se - proc?
+
+summary(mod9)
+plot(mod9)
+hist(resid(mod9))
+cat('\n')
+plotFitted(mod9,lambda,data,'GFA')
+legend(3.6,0.633,c('right','left'),pch=c(1,1),col=c(2,3))
+```
+
+***Závěr:***
+
+nic není signifikantní
